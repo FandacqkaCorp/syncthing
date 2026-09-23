@@ -2439,6 +2439,7 @@ angular.module('syncthing.core')
                 // undefined path leads to invalid input field
                 $scope.currentFolder.path = '';
             }
+            $scope.currentFolder._scheduledScanTimesStr = ($scope.currentFolder.scheduledScanTimes || []).join(', ');
             initShareEditing('folder');
             editFolderModal(initialTab);
         }
@@ -2621,6 +2622,12 @@ angular.module('syncthing.core')
 
             $scope.validateXattrFilter();
             var folderCfg = angular.copy($scope.currentFolder);
+            folderCfg.scheduledScanTimes = (folderCfg._scheduledScanTimesStr || '').split(',').map(function (x) {
+                return x.trim();
+            }).filter(function (x) {
+                return x !== '';
+            });
+            delete folderCfg._scheduledScanTimesStr;
             $scope.currentSharing.selected[$scope.myID] = true;
             var newDevices = [];
             folderCfg.devices.forEach(function (dev) {

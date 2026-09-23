@@ -350,6 +350,11 @@ func (f *folder) doInSync(fn func(context.Context) error) error {
 }
 
 func (f *folder) Reschedule() {
+	if next, ok := f.FolderConfiguration.NextScheduledScan(time.Now()); ok {
+		f.sl.Debug("Next rescan scheduled", slog.Duration("interval", next))
+		f.scanTimer.Reset(next)
+		return
+	}
 	if f.scanInterval == 0 {
 		return
 	}
