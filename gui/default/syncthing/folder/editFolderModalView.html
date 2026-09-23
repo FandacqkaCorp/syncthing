@@ -270,9 +270,9 @@
                   <label for="scheduledScanTimes" translate>Scheduled Scan Times</label>
                   <input name="scheduledScanTimes" id="scheduledScanTimes" class="form-control" type="text"
                          ng-model="currentFolder._scheduledScanTimesStr"
-                         ng-pattern="/^\s*([01]\d|2[0-3]):[0-5]\d(\s*,\s*([01]\d|2[0-3]):[0-5]\d)*\s*$/" />
+                         ng-pattern="/^\s*([01]?\d|2[0-3]):[0-5]\d(\s*,\s*([01]?\d|2[0-3]):[0-5]\d)*\s*$/" />
                   <p class="help-block" ng-if="!folderEditor.scheduledScanTimes.$valid && folderEditor.scheduledScanTimes.$dirty" translate>
-                    Enter a comma separated list of 24 hour clock times (HH:MM), for example "04:00, 12:00, 16:00".
+                    Enter a comma separated list of 24 hour clock times (H:MM or HH:MM), for example "4:00, 12:00, 16:00". The leading zero on the hour is optional, but minutes always need two digits.
                   </p>
                   <p class="help-block" translate>
                     When set, this folder is rescanned only at these times each day, instead of on the Full Rescan Interval above. Use this to confine scan and sync activity to chosen hours, for example off-peak times. This does not affect the near-instant scans triggered by "Watch for Changes" above.
