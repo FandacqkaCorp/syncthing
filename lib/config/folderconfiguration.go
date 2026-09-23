@@ -55,6 +55,7 @@ type FolderConfiguration struct {
 	Devices                 []FolderDeviceConfiguration `json:"devices" xml:"device"`
 	Group                   string                      `json:"group" xml:"group,attr,omitempty" restart:"false"`
 	RescanIntervalS         int                         `json:"rescanIntervalS" xml:"rescanIntervalS,attr" default:"3600"`
+	ScheduledScanTimes      []string                    `json:"scheduledScanTimes" xml:"scheduledScanTime,omitempty"`
 	FSWatcherEnabled        bool                        `json:"fsWatcherEnabled" xml:"fsWatcherEnabled,attr" default:"true"`
 	FSWatcherDelayS         float64                     `json:"fsWatcherDelayS" xml:"fsWatcherDelayS,attr" default:"10"`
 	FSWatcherTimeoutS       float64                     `json:"fsWatcherTimeoutS" xml:"fsWatcherTimeoutS,attr"`
@@ -297,6 +298,8 @@ func (f *FolderConfiguration) prepare(myID protocol.DeviceID, existingDevices ma
 		f.RescanIntervalS = 0
 	}
 
+	f.ScheduledScanTimes = sanitizeScheduledScanTimes(f.ScheduledScanTimes)
+
 	if f.FSWatcherDelayS <= 0 {
 		f.FSWatcherEnabled = false
 		f.FSWatcherDelayS = 10
@@ -323,6 +326,65 @@ func (f *FolderConfiguration) prepare(myID protocol.DeviceID, existingDevices ma
 	if f.Type == FolderTypeReceiveEncrypted {
 		f.IgnorePerms = true
 	}
+}
+
+// sanitizeScheduledScanTimes parses each entry as an "HH:MM" (24 hour)
+// clock time, drops anything that doesn't parse, deduplicates and sorts
+// the result, and returns the times re-formatted in canonical form.
+func sanitizeScheduledScanTimes(times []string) []string {
+	if len(times) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(times))
+	cleaned := make([]string, 0, len(times))
+	for _, t := range times {
+		parsed, err := time.Parse("15:04", strings.TrimSpace(t))
+		if err != nil {
+			continue
+		}
+		canonical := parsed.Format("15:04")
+		if _, ok := seen[canonical]; ok {
+			continue
+		}
+		seen[canonical] = struct{}{}
+		cleaned = append(cleaned, canonical)
+	}
+	if len(cleaned) == 0 {
+		return nil
+	}
+	slices.Sort(cleaned)
+	return cleaned
+}
+
+// NextScheduledScan returns how long from now until the next occurrence of
+// one of the folder's ScheduledScanTimes (today, or tomorrow if all of
+// today's times have already passed), and whether any scheduled scan times
+// are configured at all. When it returns false, the folder has no
+// ScheduledScanTimes and should fall back to its regular RescanIntervalS
+// behavior instead.
+func (f FolderConfiguration) NextScheduledScan(now time.Time) (time.Duration, bool) {
+	if len(f.ScheduledScanTimes) == 0 {
+		return 0, false
+	}
+	loc := now.Location()
+	var best time.Duration
+	found := false
+	for _, t := range f.ScheduledScanTimes {
+		parsed, err := time.ParseInLocation("15:04", t, loc)
+		if err != nil {
+			// Already sanitized in prepare(), but be defensive.
+			continue
+		}
+		next := time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc)
+		if !next.After(now) {
+			next = next.AddDate(0, 0, 1)
+		}
+		if d := next.Sub(now); !found || d < best {
+			best = d
+			found = true
+		}
+	}
+	return best, found
 }
 
 // RequiresRestartOnly returns a copy with only the attributes that require
